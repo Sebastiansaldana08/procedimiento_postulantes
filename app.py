@@ -17,23 +17,24 @@ def cargar_datos(file_path):
 def calcular_notas(df):
     df['NOTA_APT'] = df['total_aptitud'] * (100 / 60)
     df['NOTA_CON'] = df['total_conocimiento'] * (100 / 70)
-    df['NOTA_EXAMEN'] = (df['NOTA_APT'] * 0.3 + df['NOTA_CON'] * 0.7) * 0.8
+    df['NOTA_EXAMEN100'] = (df['NOTA_APT'] * 0.3 + df['NOTA_CON'] * 0.7)
+    df['NOTA_EXAMEN80'] = df['NOTA_EXAMEN100'] * 0.8
     return df
 
 def calcular_promedio_decil(df, programa):
-    df = df.sort_values(by='NOTA_EXAMEN', ascending=False).reset_index(drop=True)
+    df = df.sort_values(by='NOTA_EXAMEN100', ascending=False).reset_index(drop=True)
     N = len(df)
     R = round(N / 10)
     if R == 0:
         R = 1
     primeros_R = df.iloc[:R]
-    promedio_decil = primeros_R['NOTA_EXAMEN'].mean()
+    promedio_decil = primeros_R['NOTA_EXAMEN100'].mean()
     por_decil = 0.6 if programa == "MEDICINA" else 0.4
     decil = promedio_decil * por_decil
     return promedio_decil, decil
 
 def determinar_estado_1(df, decil):
-    df['ESTADO_1'] = df['NOTA_EXAMEN'].apply(lambda x: 'PASA A ENTREVISTA' if x >= decil else 'NO APROBÓ')
+    df['ESTADO_1'] = df['NOTA_EXAMEN80'].apply(lambda x: 'PASA A ENTREVISTA' if x >= decil else 'NO APROBÓ')
     return df
 
 def calcular_merito(df, columna):
@@ -113,12 +114,12 @@ if st.button('Procesar ESTADO_1'):
                     df_filtro['PROMEDIO_DECIL'] = promedio_decil
                     df_filtro['DECIL'] = decil
                     df_filtro = determinar_estado_1(df_filtro, decil)
-                    df_filtro = calcular_merito(df_filtro, 'NOTA_EXAMEN')
+                    df_filtro = calcular_merito(df_filtro, 'NOTA_EXAMEN80')
                     resultados.append(df_filtro)
 
         resultado_final = pd.concat(resultados, ignore_index=True)
         columnas_orden = [
-            'NOTA_APT', 'NOTA_CON', 'NOTA_EXAMEN', 'MERITO_NOTA_EXAMEN',
+            'NOTA_APT', 'NOTA_CON', 'NOTA_EXAMEN100', 'NOTA_EXAMEN80', 'MERITO_NOTA_EXAMEN80',
             'PROMEDIO_DECIL', 'DECIL', 'ESTADO_1'
         ]
         otras_columnas = [col for col in resultado_final.columns if col not in columnas_orden]
@@ -146,7 +147,7 @@ if st.button('Procesar ESTADO_2'):
             f.write(uploaded_file_3.getbuffer())
 
         datos = cargar_datos(file_path)
-        preseleccionados_path = os.path.join(UPLOAD_FOLDER, 'preseleccionados.xlsx')
+        preseleccionados_path = os.path.join(UPLOAD_FOLDER, uploaded_file_2.name)  # Ruta de preseleccionados cargada en ESTADO_1
         if not os.path.exists(preseleccionados_path):
             st.error('Debe procesar primero los datos en la sección ESTADO_1.')
         else:
@@ -170,9 +171,9 @@ if st.button('Procesar ESTADO_2'):
                         df_filtro['PROMEDIO_DECIL'] = promedio_decil
                         df_filtro['DECIL'] = decil
                         df_filtro = determinar_estado_1(df_filtro, decil)
-                        df_filtro = calcular_merito(df_filtro, 'NOTA_EXAMEN')
+                        df_filtro = calcular_merito(df_filtro, 'NOTA_EXAMEN80')
 
-                        df_filtro['NOTA_FINAL'] = df_filtro['NOTA_EXAMEN'] + df_filtro['nota_entre']
+                        df_filtro['NOTA_FINAL'] = df_filtro['NOTA_EXAMEN80'] + df_filtro['nota_entre']
                         df_filtro = calcular_merito(df_filtro, 'NOTA_FINAL')
 
                         df_filtro = determinar_estado_2(df_filtro, preseleccionados)
@@ -181,7 +182,7 @@ if st.button('Procesar ESTADO_2'):
 
             resultado_final = pd.concat(resultados, ignore_index=True)
             columnas_orden = [
-                'NOTA_APT', 'NOTA_CON', 'NOTA_EXAMEN', 'MERITO_NOTA_EXAMEN',
+                'NOTA_APT', 'NOTA_CON', 'NOTA_EXAMEN100', 'NOTA_EXAMEN80', 'MERITO_NOTA_EXAMEN80',
                 'NOTA_FINAL', 'MERITO_NOTA_FINAL', 'PROMEDIO_DECIL', 'DECIL',
                 'ESTADO_1', 'ESTADO_2', 'pronabec PRESELECCIONADO'
             ]
