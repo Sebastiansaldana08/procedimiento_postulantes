@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
+import base64
 from itertools import product
+
+# Configuración de la página
+st.set_page_config(initial_sidebar_state='collapsed', page_title="Sistema de Evaluación de Postulantes - UPCH", page_icon=":mortar_board:")
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -77,14 +81,46 @@ def determinar_pronabec_preseleccionado(df, preseleccionados):
     df['pronabec PRESELECCIONADO'] = df.apply(pronabec, axis=1)
     return df
 
-st.title('Procesamiento de Datos de Postulantes')
+# Cargar el logo y convertir a base64
+logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo-upch.png")
+if os.path.exists(logo_path):
+    with open(logo_path, "rb") as image_file:
+        encoded_logo = base64.b64encode(image_file.read()).decode()
+else:
+    encoded_logo = None
 
-st.header('Sección ESTADO_1')
+# Usar HTML para el título y el logo
+if encoded_logo:
+    st.markdown(f"""
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+            <img src="data:image/png;base64,{encoded_logo}" width="80" style="margin-right: 20px;">
+            <h1 style="margin: 0; font-size: 1.8em;">Calificación de Examen de Admisión - UPCH</h1>
+        </div>
+        """, unsafe_allow_html=True)
+else:
+    st.title('Calificación de Examen de Admisión - UPCH')
+
+# Descripción de la aplicación
+st.markdown("""
+    <div style="text-align: justify; font-size: 1.2em;">
+        <h2 style="font-size: 1.3em;"><strong>Modalidad de Evaluación</strong></h2>
+        <p>Este sistema está diseñado para procesar los aciertos de los postulantes en el examen de admisión a fin de poder determinar puntajes y orden de mérito por modalidad de admisión, carrera y periodo, determinando su elegibilidad para entrevistas y su estado final en el proceso de admisión.</p>
+        <p><strong>Para utilizar el aplicativo, siga los siguientes pasos:</strong></p>
+        <ol>
+            <li>Cargue los archivos de Excel correspondientes en cada sección.</li>
+            <li>Verifique los resultados obtenidos después del procesamiento.</li>
+            <li>Descargue los resultados procesados para su análisis y seguimiento.</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Sección ESTADO_1
+st.header('Sección ESTADO_1 (ESTADO INTERMEDIO)')
 uploaded_file_1 = st.file_uploader("Cargar archivo Excel de aciertos:", type=["xlsx"], key="estado1_aciertos")
 uploaded_file_2 = st.file_uploader("Cargar archivo Excel de preseleccionados:", type=["xlsx"], key="estado1_preseleccionados")
 
 if st.button('Procesar ESTADO_1'):
-    if uploaded_file_1 is not None and uploaded_file_2 is not None:
+    if uploaded_file_1 and uploaded_file_2:
         file_path = os.path.join(UPLOAD_FOLDER, uploaded_file_1.name)
         preseleccionados_path = os.path.join(UPLOAD_FOLDER, uploaded_file_2.name)
         with open(file_path, "wb") as f:
@@ -137,17 +173,18 @@ if st.button('Procesar ESTADO_1'):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-st.header('Sección ESTADO_2')
+# Sección ESTADO_2
+st.header('Sección ESTADO_2 (ESTADO FINAL)')
 uploaded_file_3 = st.file_uploader("Cargar archivo Excel de aciertos con notas de entrevista:", type=["xlsx"], key="estado2_aciertos")
 
 if st.button('Procesar ESTADO_2'):
-    if uploaded_file_3 is not None:
+    if uploaded_file_3:
         file_path = os.path.join(UPLOAD_FOLDER, uploaded_file_3.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file_3.getbuffer())
 
         datos = cargar_datos(file_path)
-        preseleccionados_path = os.path.join(UPLOAD_FOLDER, uploaded_file_2.name)  # Ruta de preseleccionados cargada en ESTADO_1
+        preseleccionados_path = os.path.join(UPLOAD_FOLDER, uploaded_file_2.name)  # Usar archivo preseleccionados del estado 1
         if not os.path.exists(preseleccionados_path):
             st.error('Debe procesar primero los datos en la sección ESTADO_1.')
         else:
