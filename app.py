@@ -26,16 +26,18 @@ def calcular_notas(df):
     return df
 
 def calcular_promedio_decil(df, programa):
-    df = df.sort_values(by='NOTA_EXAMEN100', ascending=False).reset_index(drop=True)
+    # Cambiar para calcular el promedio decil con respecto a NOTA_EXAMEN80
+    df = df.sort_values(by='NOTA_EXAMEN80', ascending=False).reset_index(drop=True)
     N = len(df)
     R = round(N / 10)
     if R == 0:
         R = 1
     primeros_R = df.iloc[:R]
-    promedio_decil = primeros_R['NOTA_EXAMEN100'].mean()
+    promedio_decil = primeros_R['NOTA_EXAMEN80'].mean()
     por_decil = 0.6 if programa == "MEDICINA" else 0.4
     decil = promedio_decil * por_decil
     return promedio_decil, decil
+
 
 def determinar_estado_1(df, decil):
     df['ESTADO_1'] = df['NOTA_EXAMEN80'].apply(lambda x: 'PASA A ENTREVISTA' if x >= decil else 'NO APROBÓ')
