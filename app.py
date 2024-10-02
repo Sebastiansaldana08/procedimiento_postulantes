@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+from io import BytesIO
 from itertools import product
 
 # Configuración de la página
@@ -10,78 +11,6 @@ st.set_page_config(initial_sidebar_state='collapsed', page_title="Sistema de Eva
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
-
-def cargar_datos(file_path):
-    excel_data = pd.ExcelFile(file_path)
-    datos = {}
-    for sheet in excel_data.sheet_names:
-        datos[sheet] = pd.read_excel(file_path, sheet_name=sheet, dtype={'pos_codigo': str})
-    return datos
-
-def calcular_notas(df):
-    df['NOTA_APT'] = df['total_aptitud'] * (100 / 60)
-    df['NOTA_CON'] = df['total_conocimiento'] * (100 / 70)
-    df['NOTA_EXAMEN100'] = (df['NOTA_APT'] * 0.3 + df['NOTA_CON'] * 0.7)
-    df['NOTA_EXAMEN80'] = df['NOTA_EXAMEN100'] * 0.8
-    return df
-
-def calcular_promedio_decil(df, programa):
-    # Cambiar para calcular el promedio decil con respecto a NOTA_EXAMEN80
-    df = df.sort_values(by='NOTA_EXAMEN80', ascending=False).reset_index(drop=True)
-    N = len(df)
-    R = round(N / 10)
-    if R == 0:
-        R = 1
-    primeros_R = df.iloc[:R]
-    promedio_decil = primeros_R['NOTA_EXAMEN80'].mean()
-    por_decil = 0.6 if programa == "MEDICINA" else 0.4
-    decil = promedio_decil * por_decil
-    return promedio_decil, decil
-
-
-def determinar_estado_1(df, decil):
-    df['ESTADO_1'] = df['NOTA_EXAMEN80'].apply(lambda x: 'PASA A ENTREVISTA' if x >= decil else 'NO APROBÓ')
-    return df
-
-def calcular_merito(df, columna):
-    df = df.sort_values(by=columna, ascending=False).reset_index(drop=True)
-    meritos = [1] * len(df)
-    current_merit = 1
-    repetition_count = 0
-
-    for i in range(1, len(df)):
-        if df[columna].iloc[i] == df[columna].iloc[i - 1]:
-            meritos[i] = current_merit
-            repetition_count += 1
-        else:
-            current_merit += repetition_count + 1
-            repetition_count = 0
-            meritos[i] = current_merit
-    
-    df[f'MERITO_{columna}'] = meritos
-    return df
-
-def determinar_estado_2(df, preseleccionados):
-    def estado_2(row):
-        if row['ESTADO_1'] == 'NO APROBÓ':
-            return 'NO APROBÓ'
-        elif row['per_num_doc'] in preseleccionados:
-            return 'APROBO EVALUACION'
-        else:
-            return 'INGRESANTE'
-    df['ESTADO_2'] = df.apply(estado_2, axis=1)
-    return df
-
-def determinar_pronabec_preseleccionado(df, preseleccionados):
-    def pronabec(row):
-        if row['ESTADO_2'] == 'APROBO EVALUACION':
-            return 'PRESELECCIONADO'
-        elif row['ESTADO_2'] == 'INGRESANTE':
-            return 'REGULAR'
-        elif row['ESTADO_2'] == 'NO APROBÓ':
-            return 'PRESELECCIONADO' if row['per_num_doc'] in preseleccionados else 'REGULAR'
-    df['pronabec PRESELECCIONADO'] = df.apply(pronabec, axis=1)
-    return df
 
 # Cargar el logo y convertir a base64
 logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo-upch.png")
@@ -102,6 +31,94 @@ if encoded_logo:
 else:
     st.title('Calificación de Examen de Admisión - UPCH')
 
+# Crear archivos de ejemplo para exportar
+def crear_ejemplo_aciertos():
+    df = pd.DataFrame({
+        "pos_codigo": [],
+        "tipo_documento": [],
+        "per_num_doc": [],
+        "per_apellido_pat": [],
+        "per_apellido_mat": [],
+        "pri_nombre": [],
+        "seg_nombre": [],
+        "periodo": [],
+        "modalidad": [],
+        "convocatoria": [],
+        "facultad": [],
+        "programa": [],
+        "email": [],
+        "telef_fijo": [],
+        "celular": [],
+        "rv": [],
+        "cult": [],
+        "rm": [],
+        "total_aptitud": [],
+        "biologia": [],
+        "fisica": [],
+        "maths": [],
+        "quimica": [],
+        "total_conocimiento": [],
+        "nota_entre": [],
+        "nota": []
+    })
+    return df
+
+def crear_ejemplo_preseleccionados():
+    df = pd.DataFrame({
+        "N°": [],
+        "MODALIDAD": [],
+        "per_num_doc": [],
+        "APELLIDOS Y NOMBRES": [],
+        "REGIÓN": [],
+        "PUNTAJE ENP": [],
+        "CONDICIONES PRIORIZABLES": [],
+        "PUNTAJE FINAL": [],
+        "RESULTADO": []
+    })
+    return df
+
+def crear_ejemplo_entrevista():
+    df = pd.DataFrame({
+        "pos_codigo": [],
+        "tipo_documento": [],
+        "per_num_doc": [],
+        "per_apellido_pat": [],
+        "per_apellido_mat": [],
+        "pri_nombre": [],
+        "seg_nombre": [],
+        "periodo": [],
+        "modalidad": [],
+        "convocatoria": [],
+        "facultad": [],
+        "programa": [],
+        "email": [],
+        "telef_fijo": [],
+        "celular": [],
+        "rv": [],
+        "cult": [],
+        "rm": [],
+        "total_aptitud": [],
+        "biologia": [],
+        "fisica": [],
+        "maths": [],
+        "quimica": [],
+        "total_conocimiento": [],
+        "nota_entre": [],
+        "nota": []
+    })
+    return df
+
+# Función para crear el archivo de descarga en formato Excel
+def crear_download_link_excel(df, filename, text):
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    df.to_excel(writer, index=False, sheet_name='Sheet1')
+    writer.save()
+    processed_data = output.getvalue()
+    b64 = base64.b64encode(processed_data).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">{text}</a>'
+    return href
+
 # Descripción de la aplicación
 st.markdown("""
     <div style="text-align: justify; font-size: 1.2em;">
@@ -115,6 +132,22 @@ st.markdown("""
         </ol>
     </div>
     """, unsafe_allow_html=True)
+
+# Exportables
+st.markdown("### Exportables de Formatos de Archivos")
+st.markdown("Descargue los formatos de los archivos que deben ser adjuntados:")
+
+# Exportar ejemplo de aciertos en Excel
+ejemplo_aciertos = crear_ejemplo_aciertos()
+st.markdown(crear_download_link_excel(ejemplo_aciertos, "formato_aciertos.xlsx", "Descargar formato de aciertos"), unsafe_allow_html=True)
+
+# Exportar ejemplo de preseleccionados en Excel
+ejemplo_preseleccionados = crear_ejemplo_preseleccionados()
+st.markdown(crear_download_link_excel(ejemplo_preseleccionados, "formato_preseleccionados.xlsx", "Descargar formato de preseleccionados"), unsafe_allow_html=True)
+
+# Exportar ejemplo de entrevista en Excel
+ejemplo_entrevista = crear_ejemplo_entrevista()
+st.markdown(crear_download_link_excel(ejemplo_entrevista, "formato_entrevista.xlsx", "Descargar formato de entrevista"), unsafe_allow_html=True)
 
 # Sección ESTADO_1
 st.header('Sección ESTADO_1 (ESTADO INTERMEDIO)')
@@ -239,6 +272,3 @@ if st.button('Procesar ESTADO_2'):
                     file_name="resultado_estado2.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-
-
