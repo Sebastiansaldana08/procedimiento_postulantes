@@ -199,11 +199,13 @@ def crear_download_link_excel(df, filename, text):
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
     df.to_excel(writer, index=False, sheet_name='Sheet1')
-    writer.save()
+    writer.close()  # Cambia save() por close()
+    
     processed_data = output.getvalue()
     b64 = base64.b64encode(processed_data).decode()
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">{text}</a>'
     return href
+
 
 # Sección ESTADO_1
 st.header('Sección ESTADO_1 (ESTADO INTERMEDIO)')
