@@ -10,6 +10,43 @@ st.set_page_config(initial_sidebar_state='collapsed', page_title="Sistema de Eva
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+    
+    
+# Funciones para descargar modelos
+
+def crear_download_link_excel(df, filename, text):
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    df.to_excel(writer, index=False, sheet_name='Sheet1')
+    writer.close()
+    processed_data = output.getvalue()
+    b64 = base64.b64encode(processed_data).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">{text}</a>'
+    return href
+
+def modelo_aciertos():
+    return pd.DataFrame({
+        "pos_codigo": [], "tipo_documento": [], "per_num_doc": [], "per_apellido_pat": [], "per_apellido_mat": [],
+        "pri_nombre": [], "seg_nombre": [], "periodo": [], "modalidad": [], "convocatoria": [], "facultad": [],
+        "programa": [], "email": [], "telef_fijo": [], "celular": [], "rv": [], "cult": [], "rm": [],
+        "total_aptitud": [], "biologia": [], "fisica": [], "maths": [], "quimica": [], "total_conocimiento": [],
+        "nota": []
+    })
+
+def modelo_estado_1():
+    return modelo_aciertos().assign(
+        NOTA_APT=[], NOTA_CON=[], NOTA_EXAMEN100=[], NOTA_EXAMEN80=[], MERITO_NOTA_EXAMEN80=[],
+        PROMEDIO_DECIL=[], DECIL=[], ESTADO_1=[]
+    )
+
+def modelo_estado_2():
+    return modelo_estado_1().assign(nota_entre=[], NOTA_FINAL=[], MERITO_NOTA_FINAL=[], ESTADO_2=[])
+
+def modelo_preseleccionados():
+    return pd.DataFrame({
+        "N°": [], "MODALIDAD": [], "per_num_doc": [], "APELLIDOS Y NOMBRES": [], "REGIÓN": [],
+        "PUNTAJE ENP": [], "CONDICIONES PRIORIZABLES": [], "PUNTAJE FINAL": [], "RESULTADO": []
+    })
 
 def cargar_datos(file_path):
     excel_data = pd.ExcelFile(file_path)
@@ -102,6 +139,14 @@ st.markdown("""
         </ol>
     </div>
     """, unsafe_allow_html=True)
+
+# Descarga de modelos
+st.markdown("### Descarga de modelos de archivos")
+col1, col2 = st.columns(2)
+col1.markdown(crear_download_link_excel(modelo_aciertos(), "modelo_aciertos.xlsx", "Descargar modelo de aciertos"), unsafe_allow_html=True)
+col2.markdown(crear_download_link_excel(modelo_preseleccionados(), "modelo_preseleccionados.xlsx", "Descargar modelo de preseleccionados"), unsafe_allow_html=True)
+col1.markdown(crear_download_link_excel(modelo_estado_1(), "modelo_estado1.xlsx", "Descargar modelo de ESTADO_1"), unsafe_allow_html=True)
+col2.markdown(crear_download_link_excel(modelo_estado_2(), "modelo_estado2.xlsx", "Descargar modelo de ESTADO_2"), unsafe_allow_html=True)
 
 # Sección ESTADO_1
 st.header('Sección ESTADO_1 (ESTADO INTERMEDIO)')
