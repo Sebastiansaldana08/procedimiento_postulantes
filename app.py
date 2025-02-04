@@ -36,9 +36,8 @@ def modelo_aciertos():
 def modelo_estado_1():
     return modelo_aciertos().assign(
         NOTA_APT=[], NOTA_CON=[], NOTA_EXAMEN100=[], NOTA_EXAMEN80=[], MERITO_NOTA_EXAMEN80=[],
-        PROMEDIO_DECIL=[], DECIL=[], ESTADO_1=[]
+        PROMEDIO_DECIL=[], DECIL=[], PRESELECCIONADO=[], ESTADO_1=[]
     )
-
 def modelo_estado_2():
     return modelo_estado_1().assign(nota_entre=[], NOTA_FINAL=[], MERITO_NOTA_FINAL=[], ESTADO_2=[])
 
@@ -74,8 +73,18 @@ def calcular_promedio_decil(df, programa):
     decil = promedio_decil * por_decil
     return promedio_decil, decil
 
-def determinar_estado_1(df, decil):
-    df['ESTADO_1'] = df['NOTA_EXAMEN80'].apply(lambda x: 'PASA A ENTREVISTA' if x >= decil else 'NO APROBÓ')
+def determinar_estado_1(df, decil, preseleccionados=None):
+    df['PRESELECCIONADO'] = df['per_num_doc'].apply(lambda x: 'SI' if preseleccionados and x in preseleccionados else 'NO')
+
+    def estado_1(row):
+        if row['NOTA_EXAMEN80'] >= decil:
+            return 'APROBÓ EVALUACIÓN' if row['PRESELECCIONADO'] == 'SI' else 'PASA A ENTREVISTA'
+        elif row['NOTA_EXAMEN80'] >= 20:
+            return 'APROBÓ > 20'
+        else:
+            return 'NO APROBÓ'
+
+    df['ESTADO_1'] = df.apply(estado_1, axis=1)
     return df
 
 def calcular_merito(df, columna):
@@ -150,16 +159,23 @@ col2.markdown(crear_download_link_excel(modelo_estado_2(), "modelo_estado2.xlsx"
 
 # Sección ESTADO_1
 st.header('Sección ESTADO_1 (ESTADO INTERMEDIO)')
-uploaded_file_1 = st.file_uploader("Cargar archivo Excel de aciertos:", type=["xlsx"], key="estado1_aciertos")
+uploaded_file_preseleccionados = st.file_uploader("Cargar archivo Excel de preseleccionados (opcional):", type=["xlsx"], key="estado1_preseleccionados")
+uploaded_file_aciertos = st.file_uploader("Cargar archivo Excel de aciertos:", type=["xlsx"], key="estado1_aciertos")
 
 if st.button('Procesar ESTADO_1'):
-    if uploaded_file_1:
-        file_path = os.path.join(UPLOAD_FOLDER, uploaded_file_1.name)
+    if uploaded_file_aciertos:
+        preseleccionados = None
+        if uploaded_file_preseleccionados:
+            preseleccionados_df = pd.read_excel(uploaded_file_preseleccionados)
+            preseleccionados = preseleccionados_df['per_num_doc'].astype(str).tolist()
+
+        file_path = os.path.join(UPLOAD_FOLDER, uploaded_file_aciertos.name)
         with open(file_path, "wb") as f:
-            f.write(uploaded_file_1.getbuffer())
-        
+            f.write(uploaded_file_aciertos.getbuffer())
+
         datos = cargar_datos(file_path)
         resultados = []
+
         for periodo, df in datos.items():
             df = calcular_notas(df)
             df['periodo'] = periodo
@@ -171,8 +187,7 @@ if st.button('Procesar ESTADO_1'):
                     promedio_decil, decil = calcular_promedio_decil(df_filtro, programa)
                     df_filtro['PROMEDIO_DECIL'] = promedio_decil
                     df_filtro['DECIL'] = decil
-                    df_filtro = determinar_estado_1(df_filtro, decil)
-                    df_filtro = calcular_merito(df_filtro, 'NOTA_EXAMEN80')
+                    df_filtro = determinar_estado_1(df_filtro, decil, preseleccionados)
                     resultados.append(df_filtro)
 
         resultado_final = pd.concat(resultados, ignore_index=True)
@@ -187,6 +202,7 @@ if st.button('Procesar ESTADO_1'):
                 file_name="resultado_estado1.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
 
 # Sección ESTADO_2
 st.header('Sección ESTADO_2 (ESTADO FINAL)')
